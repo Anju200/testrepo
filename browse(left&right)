@@ -1,0 +1,199 @@
+       IDENTIFICATION DIVISION.                                     
+       PROGRAM-ID.     BROWSE1.                                     
+      *                                                             
+       ENVIRONMENT DIVISION.                                        
+       DATA DIVISION.                                               
+       WORKING-STORAGE SECTION.                                     
+       COPY A08MPS2.                                                
+       COPY DFHAID.                                                 
+      *                                                             
+       01 CUST-RECORD-LEN  PIC S9(04) COMP.                         
+       01 CUST-RECORD-LEN2 PIC S9(04) COMP.                         
+       01 WS-RESP          PIC S9(08) COMP.                         
+       01 WS-RESP-ED       PIC 9(04).                               
+       01 CUST-RECORD.                                              
+          05 CUST-CODE     PIC X(05).                               
+          05 CUST-NAME     PIC X(20).                               
+          05 CUST-ADDR     PIC X(30).                            
+          05 CUST-CITY     PIC X(10).                            
+          05 CUST-ZIPCODE  PIC X(06).                            
+       01 CUST-RECORD1.                                          
+          05 CUST-CODE1    PIC X(05).                            
+          05 CUST-NAME1    PIC X(20).                            
+          05 CUST-ADDR1    PIC X(30).                            
+       01 CUST-RECORD2.                                          
+          05 CUST-CITY2    PIC X(10).                            
+          05 CUST-ZIPCODE2 PIC X(06).                            
+       77 WS-SUB           PIC 9(02).                            
+       77 WS-ABS-TIME      PIC S9(15) COMP.                      
+       77 WS-SEP           PIC X VALUE '-'.                      
+       01 WS-END           PIC 9(1) VALUE 0.                     
+       88 END-OF-RECORDS   VALUE 1.                              
+       01 WS-COMM-AREA.                                          
+          05 WS-DATA       PIC X(05).                            
+          05 WS-DATE       PIC X(10).                                   
+      *                                                                 
+       LINKAGE SECTION.                                                 
+       01 DFHCOMMAREA.                                                  
+          05 LK-COMM-AREA.                                              
+            10 LK-DATA     PIC X(05).                                   
+            10 LK-DATE     PIC X(10).                                   
+      *                                                                 
+       PROCEDURE DIVISION.                                              
+       MAIN-PARA.                                                       
+      *                                                                 
+           IF EIBCALEN = 0                                              
+              MOVE LOW-VALUES TO EMPIN1O                                
+              PERFORM 1000-GET-PARA                                     
+              PERFORM 2000-SEND1-PARA                                   
+              MOVE 'BROW1' TO WS-DATA                                   
+              PERFORM 8888-RETURN-TRANS-PARA                            
+              MOVE LOW-VALUES TO EMPIN2O                           
+              PERFORM 1000-GET-PARA                                
+              PERFORM 2000-SEND2-PARA                              
+              MOVE 'BROW2' TO WS-DATA                              
+              PERFORM 8888-RETURN-TRANS-PARA                       
+      *                                                            
+           ELSE                                                    
+              MOVE LK-COMM-AREA TO WS-COMM-AREA                    
+              PERFORM 7777-KEY-CHECK-PARA                          
+           END-IF.                                                 
+  *                                                                
+       1000-GET-PARA.                                              
+           EXEC CICS ASKTIME                                       
+              ABSTIME(WS-ABS-TIME)                                 
+           END-EXEC.                                               
+      *                                                            
+           EXEC CICS                                               
+                FORMATTIME                             
+                ABSTIME(WS-ABS-TIME)                   
+                DATESEP(WS-SEP)                        
+                DDMMYYYY(WS-DATE)                      
+           END-EXEC.                                   
+      *                                                
+       2000-SEND1-PARA.                                
+           MOVE WS-DATE TO DATE1O                      
+           EXEC CICS                                   
+                SEND MAP('EMPIN1') MAPSET('A08MPS2')   
+                ERASE                                  
+           END-EXEC.                                   
+      *                                                
+       2000-SEND2-PARA.                                
+           MOVE WS-DATE TO DATE2O                      
+           EXEC CICS                                   
+                SEND MAP('EMPIN2') MAPSET('A08MPS2')   
+                ERASE                                       
+           END-EXEC.                                        
+       7777-KEY-CHECK-PARA.                                 
+           EVALUATE EIBAID                                  
+             WHEN DFHENTER                                  
+               PERFORM 4000-BROWSE1-PARA                    
+               PERFORM 6000-MAP1-PARA                       
+             WHEN DFHPF10                                   
+               PERFORM 6000-MAP1-PARA                       
+             WHEN DFHPF11                                   
+               PERFORM 6000-MAP2-PARA                       
+             WHEN DFHPF3                                    
+               MOVE 'YOU ARE LOGGED OUT' TO EMPMSG1O        
+               MOVE 'YOU ARE LOGGED OUT' TO EMPMSG2O        
+               PERFORM 2000-SEND1-PARA                      
+               PERFORM 2000-SEND2-PARA                      
+               PERFORM 9999-RETURN-PARA                     
+             WHEN DFHPF5                                          
+               MOVE LOW-VALUES TO EMPIN1O                         
+               MOVE LOW-VALUES TO EMPIN2O                         
+               PERFORM 2000-SEND1-PARA                            
+               PERFORM 2000-SEND2-PARA                            
+               PERFORM 8888-RETURN-TRANS-PARA                     
+             WHEN OTHER                                           
+               MOVE ' ENTER VALID KEY' TO EMPMSG1O                
+               MOVE ' ENTER VALID KEY' TO EMPMSG2O                
+               PERFORM 2000-SEND1-PARA                            
+               PERFORM 2000-SEND2-PARA                            
+               PERFORM 8888-RETURN-TRANS-PARA                     
+           END-EVALUATE.                                          
+      *                                                           
+       3000-RECIEVE1-PARA.                                        
+           EXEC CICS                                              
+                RECEIVE MAP('EMPIN1')                             
+                MAPSET('A08MPS2')                         
+           END-EXEC.                                      
+      *                                                   
+       3000-RECIEVE2-PARA.                                
+           EXEC CICS                                      
+                RECEIVE MAP('EMPIN2')                     
+                MAPSET('A08MPS2')                         
+           END-EXEC.                                      
+       4000-BROWSE1-PARA.                                 
+      *                                                   
+           MOVE ZEROS TO CUST-CODE                        
+           EXEC CICS                                      
+              STARTBR                                     
+              FILE('A08FIL1')                             
+              RIDFLD(CUST-CODE)                           
+              GTEQ                                        
+              RESP(WS-RESP)                               
+           END-EXEC.                                          
+           IF WS-RESP = DFHRESP(NORMAL)                       
+             PERFORM 4100-GET1-CUSTOMER-PARA VARYING WS-SUB   
+                 FROM 1 BY 1                                  
+                 UNTIL WS-SUB > 10 OR END-OF-RECORDS          
+               EXEC CICS                                      
+                ENDBR FILE('A08FIL1')                         
+               END-EXEC                                       
+           ELSE                                               
+             MOVE WS-RESP TO WS-RESP-ED                       
+             STRING ' READ ERROR ' DELIMITED BY SIZE          
+                    WS-RESP-ED     DELIMITED BY SIZE          
+                    INTO EMPMSG1O                             
+           END-IF.                                            
+       6000-MAP1-PARA.                                        
+           PERFORM 2000-SEND1-PARA                            
+           PERFORM 8888-RETURN-TRANS-PARA.                    
+       6000-MAP2-PARA.                                                  
+           PERFORM 2000-SEND2-PARA                                      
+           PERFORM 8888-RETURN-TRANS-PARA.                              
+       4100-GET1-CUSTOMER-PARA.                                         
+      *   MOVE FROM MAP SYSMBOLIC VARIABLES TO KEY FIELD, READ          
+           MOVE 71  TO  CUST-RECORD-LEN                                 
+      *   MOVE FROM MAP SYSMBOLIC VARIABLES TO RECORD                   
+      *   WRITE INTO FILE                                               
+           EXEC  CICS READNEXT                                          
+               FILE('A08FIL1')                                          
+               INTO(CUST-RECORD)                                        
+               RIDFLD(CUST-CODE)                                        
+               LENGTH(CUST-RECORD-LEN)                                  
+               RESP(WS-RESP)                                            
+           END-EXEC.                                                    
+           EVALUATE WS-RESP                                             
+             WHEN DFHRESP(NORMAL)                                       
+               MOVE CUST-CODE  TO CUST-CODE1                      
+               MOVE CUST-NAME  TO CUST-NAME1                      
+               MOVE CUST-ADDR  TO CUST-ADDR1                      
+               MOVE CUST-CITY  TO CUST-CITY2                      
+               MOVE CUST-ZIPCODE TO CUST-ZIPCODE2                 
+               MOVE CUST-RECORD1 TO DETAIL1O(WS-SUB)              
+               MOVE CUST-RECORD2 TO DETAIL2O(WS-SUB)              
+             WHEN DFHRESP(ENDFILE)                                
+               SET END-OF-RECORDS  TO TRUE                        
+               MOVE 'END OF RECORDS ' TO EMPMSG1O                 
+               MOVE 'END OF RECORDS ' TO EMPMSG2O                 
+             WHEN OTHER                                           
+               SET END-OF-RECORDS  TO TRUE                        
+               MOVE WS-RESP     TO WS-RESP-ED                     
+               STRING 'READ  ERROR1' DELIMITED BY SIZE            
+                     WS-RESP-ED     DELIMITED BY SIZE             
+                     INTO  EMPMSG1O                               
+               MOVE EMPMSG1O TO EMPMSG2O        
+           END-EVALUATE.                        
+       8888-RETURN-TRANS-PARA.                  
+           EXEC CICS                            
+             RETURN                             
+             TRANSID('A084')                    
+             COMMAREA(WS-COMM-AREA)             
+           END-EXEC.                            
+      *                                         
+       9999-RETURN-PARA.                        
+           EXEC CICS                            
+               RETURN                           
+           END-EXEC.  
